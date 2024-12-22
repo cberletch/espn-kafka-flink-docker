@@ -1,16 +1,49 @@
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.common.serialization import SimpleStringSchema
 from pyflink.datastream.connectors import FlinkKafkaConsumer
-import os
+from pyflink.table import StreamTableEnvironment, DataTypes, Schema
+import psycopg2
+from psycopg2.extras import Json
 import json
+import os
+from typing import Dict, Any
+
+def get_db_connection():
+    return psycopg2.connect(
+        dbname="nfl_stats",
+        user="admin",
+        password="password123",
+        host="localhost",
+        port="5432"
+    )
+
+def process_message(msg: str):
+    try:
+        conn = get_db_connection()
+        data = json.loads(msg)
+        table_name = "nfl_data"
+        
+        # Store raw JSON
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS nfl_data (
+                    id SERIAL PRIMARY KEY,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    data JSONB
+                )
+            """)
+            cur.execute("INSERT INTO nfl_data (data) VALUES (%s)", (Json(data),))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error processing message: {e}")
+        return False
 
 def process_events():
     env = StreamExecutionEnvironment.get_execution_environment()
     
     kafka_jar = os.path.abspath("libs/flink-sql-connector-kafka-3.0.0-1.17.jar")
-    if not os.path.exists(kafka_jar):
-        raise FileNotFoundError(f"Kafka JAR not found at: {kafka_jar}")
-        
     env.add_jars(f"file://{kafka_jar}")
 
     kafka_props = {
@@ -19,19 +52,15 @@ def process_events():
         'auto.offset.reset': 'earliest'
     }
 
-    kafka_consumer = env.add_source(
-        FlinkKafkaConsumer(
-            topics='nfl_data_scores',
-            deserialization_schema=SimpleStringSchema(),
-            properties=kafka_props
-        )
+    consumer = FlinkKafkaConsumer(
+        topics='nfl_data_scores',
+        deserialization_schema=SimpleStringSchema(),
+        properties=kafka_props
     )
-
-    kafka_consumer.print()
+    
+    stream = env.add_source(consumer)
+    stream.map(lambda x: process_message(x))
     env.execute("NFL Data Pipeline")
-
-def parse_json(event: str):
-    return json.loads(event)
 
 if __name__ == "__main__":
     process_events()

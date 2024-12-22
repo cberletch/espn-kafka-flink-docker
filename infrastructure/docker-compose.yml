@@ -34,8 +34,8 @@ services:
       KAFKA_BROKERCONNECT: kafka:29092
       JVM_OPTS: "-Xms32M -Xmx64M"
 
-  timescaledb:
-    image: timescale/timescaledb:latest-pg14
+  postgres:
+    image: postgres:14
     ports:
       - "5432:5432"
     environment:
@@ -43,9 +43,8 @@ services:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: password123
     volumes:
-      - timescale_data:/var/lib/postgresql/data
-      - ./init-scripts:/docker-entrypoint-initdb.d
+      - postgres_data:/var/lib/postgresql/data
 
 volumes:
-  timescale_data:
+  postgres_data:
     driver: local
