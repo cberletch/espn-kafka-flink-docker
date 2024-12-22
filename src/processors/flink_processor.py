@@ -5,6 +5,8 @@ from datetime import datetime
 import os
 
 def create_timescale_sink():
+    USER_NAME = os.getenv('POSTGRES_USER')
+    PASSWORD = os.getenv('POSTGRES_PASSWORD')
     return f"""
         CREATE TABLE game_events_sink (
             event_time TIMESTAMP(3),
@@ -26,13 +28,14 @@ def create_timescale_sink():
             'connector' = 'jdbc',
             'url' = 'jdbc:postgresql://timescaledb:5432/nfl_stats',
             'table-name' = 'game_events',
-            'username' = {os.getenv('POSTGRES_USER')},
-            'password' = {os.getenv('POSTGRES_PASSWORD')},
+            'username' = '{USER_NAME}',
+            'password' = '{PASSWORD}',
             'driver' = 'org.postgresql.Driver'
         )
     """
 
 def process_events():
+    
     # Set up the streaming environment
     env = StreamExecutionEnvironment.get_execution_environment()
     settings = EnvironmentSettings.new_instance() \
@@ -43,26 +46,54 @@ def process_events():
 
     # Add required JARs
     t_env.get_config().get_configuration().set_string(
-        "pipeline.jars",
-        "file:///libs/postgresql-42.2.27.jar;"
-        "file:///libs/flink-connector-jdbc-3.1.0-1.17.jar"
+    "pipeline.jars",
+    "file:///libs/postgresql-42.2.27.jar;"
+    "file:///libs/flink-connector-jdbc-3.1.0-1.17.jar;"
+    "file:///libs/flink-sql-connector-kafka-3.0.0-1.17.jar;"
+    "file:///libs/flink-json-1.17.0.jar"
+    )
+
+    # Add format jar
+    t_env.get_config().get_configuration().set_string(
+        "pipeline.auto-classpaths", "true"
     )
 
     # Create Kafka source table
-    kafka_source = """
-        CREATE TABLE kafka_events (
-            payload STRING
-        ) WITH (
-            'connector' = 'kafka',
-            'topic' = 'nfl-events',
-            'properties.bootstrap.servers' = 'kafka:9092',
-            'properties.group.id' = 'flink-consumer-group',
-            'format' = 'raw'
-        )
+    kafka_sources = """
+    CREATE TABLE kafka_scores (
+        payload STRING
+    ) WITH (
+        'connector' = 'kafka',
+        'topic' = 'nfl_data_scores',
+        'properties.bootstrap.servers' = 'kafka:9092',
+        'properties.group.id' = 'flink-consumer-group',
+        'format' = 'raw'
+    );
+
+    CREATE TABLE kafka_games (
+        payload STRING
+    ) WITH (
+        'connector' = 'kafka',
+        'topic' = 'nfl_data_games',
+        'properties.bootstrap.servers' = 'kafka:9092',
+        'properties.group.id' = 'flink-consumer-group',
+        'format' = 'raw'
+    );
+
+    CREATE TABLE kafka_news (
+        payload STRING
+    ) WITH (
+        'connector' = 'kafka',
+        'topic' = 'nfl_data_news',
+        'properties.bootstrap.servers' = 'kafka:9092',
+        'properties.group.id' = 'flink-consumer-group',
+        'format' = 'raw'
+    );
     """
 
-    # Create tables
-    t_env.execute_sql(kafka_source)
+    # Update process_events to execute multiple source creations
+    t_env.execute_sql(kafka_sources)
+
     t_env.execute_sql(create_timescale_sink())
 
     # Transform and insert data

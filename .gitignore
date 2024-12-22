@@ -175,3 +175,4 @@ airflow/logs
 airflow/logs/scheduler/2024-10-30/native_dags/example_dags/example_passing_params_via_test_command.py.log
 venv311/lib64
 venv311
+libs/
