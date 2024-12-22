@@ -9,6 +9,7 @@ This project implements a real-time data streaming pipeline that fetches NFL dat
 - **Stream Processing**: Apache Flink
 - **Visualization**: Kafdrop (Kafka UI)
 - **Container Orchestration**: Docker & Docker Compose
+- **Database**: TimescaleDB (PostgreSQL extension)
 - **Optional Scheduler**: Apache Airflow
 
 ## Prerequisites
@@ -92,7 +93,7 @@ The `docker-compose.yml` includes:
 
 To start the Kafka environment:
 ```bash
-cd kafka/
+cd services/
 docker-compose up -d
 ```
 

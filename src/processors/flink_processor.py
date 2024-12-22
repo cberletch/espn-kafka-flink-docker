@@ -1,69 +1,91 @@
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.table import StreamTableEnvironment, EnvironmentSettings
-from pyflink.table.expressions import col
 import json
+from datetime import datetime
+import os
 
-def main():
+def create_timescale_sink():
+    return f"""
+        CREATE TABLE game_events_sink (
+            event_time TIMESTAMP(3),
+            game_id STRING,
+            event_type STRING,
+            team_id STRING,
+            player_id STRING,
+            score_home INT,
+            score_away INT,
+            quarter INT,
+            time_remaining STRING,
+            yard_line INT,
+            down INT,
+            yards_to_go INT,
+            event_description STRING,
+            metadata STRING,
+            created_at TIMESTAMP(3)
+        ) WITH (
+            'connector' = 'jdbc',
+            'url' = 'jdbc:postgresql://timescaledb:5432/nfl_stats',
+            'table-name' = 'game_events',
+            'username' = {os.getenv('POSTGRES_USER')},
+            'password' = {os.getenv('POSTGRES_PASSWORD')},
+            'driver' = 'org.postgresql.Driver'
+        )
+    """
+
+def process_events():
+    # Set up the streaming environment
     env = StreamExecutionEnvironment.get_execution_environment()
-    settings = EnvironmentSettings.new_instance()\
-                    .in_streaming_mode()\
-                    .build()
+    settings = EnvironmentSettings.new_instance() \
+        .in_streaming_mode() \
+        .build()
     
     t_env = StreamTableEnvironment.create(env, settings)
 
+    # Add required JARs
     t_env.get_config().get_configuration().set_string(
-        "pipeline.jars", 
-        "file:///home/cole/source/repos/streaming/libs/flink-connector-kafka-1.17.0.jar;"
-        "file:///home/cole/source/repos/streaming/libs/kafka-clients-3.2.3.jar;"
-        "file:///home/cole/source/repos/streaming/libs/flink-json-1.20.0.jar"
+        "pipeline.jars",
+        "file:///libs/postgresql-42.2.27.jar;"
+        "file:///libs/flink-connector-jdbc-3.1.0-1.17.jar"
     )
-    
-    env.set_parallelism(1)
-    
-    create_kafka_source_tables(t_env)
-    
-    print_sink_ddl = """
-        CREATE TABLE print_sink (
-            events STRING
-        ) WITH (
-            'connector' = 'print'
-        )
-    """
-    t_env.execute_sql(print_sink_ddl)
-    
-    statement_set = t_env.create_statement_set()
-    statement_set.add_insert_sql("""
-        INSERT INTO print_sink
-        SELECT events FROM kafka_scores_raw
-    """)
-    
-    statement_set.execute()
 
-    print("\nQuerying the raw table:")
-    t_env.execute_sql("""
-        SELECT * FROM kafka_scores_raw
-        LIMIT 5
-    """).print()
-
-def create_kafka_source_tables(t_env):
-    scores_ddl = """
-        CREATE TABLE kafka_scores_raw (
-            events STRING
+    # Create Kafka source table
+    kafka_source = """
+        CREATE TABLE kafka_events (
+            payload STRING
         ) WITH (
             'connector' = 'kafka',
-            'topic' = 'nfl_data_scores',
-            'properties.bootstrap.servers' = 'localhost:9092',
-            'properties.group.id' = 'flink_nfl_consumer',
-            'format' = 'json',
-            'json.fail-on-missing-field' = 'false',
-            'json.ignore-parse-errors' = 'true',
-            'scan.startup.mode' = 'latest-offset'
+            'topic' = 'nfl-events',
+            'properties.bootstrap.servers' = 'kafka:9092',
+            'properties.group.id' = 'flink-consumer-group',
+            'format' = 'raw'
         )
     """
-    t_env.execute_sql(scores_ddl)
-    
-    print("\nRegistered Tables:")
-    print(t_env.list_tables())
+
+    # Create tables
+    t_env.execute_sql(kafka_source)
+    t_env.execute_sql(create_timescale_sink())
+
+    # Transform and insert data
+    t_env.sql_query("""
+        INSERT INTO game_events_sink
+        SELECT
+            CAST(JSON_VALUE(payload, '$.event_time') AS TIMESTAMP(3)) as event_time,
+            JSON_VALUE(payload, '$.game_id') as game_id,
+            JSON_VALUE(payload, '$.event_type') as event_type,
+            JSON_VALUE(payload, '$.team_id') as team_id,
+            JSON_VALUE(payload, '$.player_id') as player_id,
+            CAST(JSON_VALUE(payload, '$.score_home') AS INT) as score_home,
+            CAST(JSON_VALUE(payload, '$.score_away') AS INT) as score_away,
+            CAST(JSON_VALUE(payload, '$.quarter') AS INT) as quarter,
+            JSON_VALUE(payload, '$.time_remaining') as time_remaining,
+            CAST(JSON_VALUE(payload, '$.yard_line') AS INT) as yard_line,
+            CAST(JSON_VALUE(payload, '$.down') AS INT) as down,
+            CAST(JSON_VALUE(payload, '$.yards_to_go') AS INT) as yards_to_go,
+            JSON_VALUE(payload, '$.event_description') as event_description,
+            payload as metadata,
+            CURRENT_TIMESTAMP as created_at
+        FROM kafka_events
+    """).execute()
 
 if __name__ == "__main__":
-    main()
+    process_events()
