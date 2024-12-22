@@ -40,8 +40,8 @@ services:
       - "5432:5432"
     environment:
       POSTGRES_DB: nfl_stats
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password123
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
 

@@ -12,8 +12,8 @@ def get_db_connection():
     return psycopg2.connect(
         dbname="nfl_stats",
         user="admin",
-        password="password123",
-        host="localhost",
+        host=os.getenv("POSTGRES_PASSWORD"), 
+        password=os.getenv("POSTGRES_USER"), 
         port="5432"
     )
 
