@@ -2,6 +2,7 @@ from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.common.serialization import SimpleStringSchema
 from pyflink.datastream.connectors import FlinkKafkaConsumer
 import os
+import json
 
 def process_events():
     env = StreamExecutionEnvironment.get_execution_environment()
@@ -28,6 +29,9 @@ def process_events():
 
     kafka_consumer.print()
     env.execute("NFL Data Pipeline")
+
+def parse_json(event: str):
+    return json.loads(event)
 
 if __name__ == "__main__":
     process_events()
