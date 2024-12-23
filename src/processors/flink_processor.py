@@ -11,9 +11,9 @@ from typing import Dict, Any
 def get_db_connection():
     return psycopg2.connect(
         dbname="nfl_stats",
-        user="admin",
-        host=os.getenv("POSTGRES_USER"), 
-        password=os.getenv("POSTGRES_PASSWORD"), 
+        user=os.getenv("POSTGRES_USER"),
+        password=os.getenv("POSTGRES_PASSWORD"),
+        host="infrastructure_postgres_1", 
         port="5432"
     )
 

@@ -7,11 +7,15 @@ import json
 import os
 
 def extract_from_postgres():
+    user = 'airflow_user'
+    password = os.getenv("POSTGRES_PASSWORD")
+    print(f"Attempting connection with user: {user}")
+
     pg_conn = psycopg2.connect(
         dbname="nfl_stats",
-        user=os.getenv("POSTGRES_USER"),
-        password=os.getenv("POSTGRES_PASSWORD"),
-        host="localhost",
+        user=user,
+        password=password,
+        host="infrastructure_postgres_1",
         port="5432"
     )
     
@@ -43,7 +47,7 @@ default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
     'start_date': datetime(2024, 12, 20),
-    'retries': 1,
+    'retries': 0,
     'retry_delay': timedelta(days=1),
 }
 

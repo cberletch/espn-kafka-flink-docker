@@ -161,6 +161,11 @@ newgrp docker
 - Verify virtual environment activation
 - Check all required dependencies are installed
 
+3. Getting into Postgres for test querying
+```
+docker exec -it infrastructure_postgres_1 psql -U admin -d nfl_stats
+```
+
 ## Future Enhancements
 - Implementation of Airflow DAGs for scheduled processing
 - Additional data transformations in Flink

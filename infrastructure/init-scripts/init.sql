@@ -57,3 +57,10 @@ SELECT add_retention_policy(game_events, INTERVAL 1 year);
 -- Grants
 GRANT SELECT, INSERT ON game_events TO admin;
 GRANT SELECT ON game_summaries TO admin;
+
+# init.sql
+ALTER SYSTEM SET password_encryption = 'scram-sha-256';
+
+CREATE USER airflow_user WITH PASSWORD 'local_password';
+GRANT ALL PRIVILEGES ON DATABASE nfl_stats TO airflow_user;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO airflow_user;
